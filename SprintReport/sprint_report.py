@@ -43,16 +43,23 @@ def find_issue_in_jira_sprint(jira_api, project, sprint):
 
         issue_index += 1
         epics = {}
+        epics_versions = {}
         # For each issue in JIRA with LP# in the title
         for issue in issues:
             summary = issue.fields.summary
             issue_type = issue.fields.issuetype.name
             epic_link = issue.fields.customfield_10014
+            epic = None
             if epic_link not in epics:
                 try:
-                    epics[epic_link] = jira_api.issue(epic_link).fields.summary
+                    epic = jira_api.issue(epic_link)
                 except JIRAError:
                     epics[epic_link] = "No epic"
+                    epics_versions[epic_link] = []
+                else:
+                    epics[epic_link] = epic.fields.summary
+                    epics_versions[epic_link] = [
+                        release.name for release in epic.fields.fixVersions]
             epic_name = epics[epic_link]
             found_issues[issue.key]= {
                 "key":issue.key,
@@ -60,6 +67,7 @@ def find_issue_in_jira_sprint(jira_api, project, sprint):
                 "status": issue.fields.status,
                 "epic": epic_link,
                 "epic_name": epic_name,
+                "fix_versions": epics_versions[epic_link],
                 "summary":summary}
 
     return found_issues
@@ -105,7 +113,7 @@ def print_jira_report(issues):
         if issues[issue]["epic"] != epic:
             epic = issues[issue]["epic"]
             if epic:
-                print("\n## {}: {}".format(key_to_md(epic), issues[issue]["epic_name"]))
+                print("\n## {}: {} ({})".format(key_to_md(epic), issues[issue]["epic_name"], ", ".join(issues[issue]["fix_versions"])))
             else:
                 print("\n## Issues without an epic")
         print_jira_issue(issues[issue])
